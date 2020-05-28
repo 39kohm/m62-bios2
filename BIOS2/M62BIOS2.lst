@@ -1,0 +1,33 @@
+0001   0000             ;************************************
+0002   0000             ; M62 BIOS2
+0003   0000             ;************************************
+0004   0000             ; M62BIOS2.asm - Main BIOS 2 file
+0005   0000             ;************************************
+0006   0000             ; By Peter Murray & Don Prefontaine
+0007   0000             ;************************************
+0008   0000             #DEFINE 		STACK_ADDRESS 	$7FFF
+0009   0000             
+0010   0000             ;********************
+0011   0000             ; System entry point
+0012   0000             ;********************
+0013   0000             
+0014   0000             .ORG $0000	; Reset vector
+0015   0000 C3 69 00    RST_VECTOR:		JP START	; Jump to start of code
+0016   0003             
+0017   0038             .ORG $0038	; INT vector
+0018   0038 C3 69 00    INT_VECTOR:		JP START	; For now we just go back to start
+0019   003B             
+0020   0066             .ORG $0066	; NMI Vector
+0021   0066~            #IFDEF NMI_HANDLER
+0022   0066~            				JP NMI_START
+0023   0066             #ENDIF
+0024   0066             
+0025   0066 C3 69 00    NMI_VECTOR:		JP START	; For now we just go back to start
+0026   0069             
+0027   0069             START:
+0028   0069 F3          				DI							; Disable interrupts
+0029   006A 31 FF 7F    				LD		SP,STACK_ADDRESS	; Load the stack pointer for stack operations.
+0030   006D             
+0031   006D 76          				HALT
+0032   006E             
+0033   006E             .ENDtasm: Number of errors = 0

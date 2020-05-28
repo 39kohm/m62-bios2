@@ -1,0 +1,1296 @@
+0001   0000             ;*********************************************
+0002   0000             ; M62 - BIOS 2 OS image (this runs from RAM)
+0003   0000             ;*********************************************
+0004   0000             ; OSIMAGE.asm
+0005   0000             ;*********************************************
+0006   0000             ; By Peter Murray
+0007   0000             ; https://www.m62.ca
+0008   0000             ;*********************************************
+0009   0000             ; Compile with TASM using -80 -x -g3 -c -f00
+0010   0000             ;*********************************************
+0011   0000             
+0012   0000             MLOCATION:		.EQU	$4000
+0013   0000             conaddr:		.EQU	$7700	; Where the console UART I/O base port address resides
+0014   0000             cfaddr:			.EQU	$7701	; Where the CF I/O base port address resides
+0015   0000             
+0016   4000             .ORG MLOCATION  ; Run this at MLOCATION
+0017   4000 C3 28 40    ENTRY:			jp	OSIMAGE
+0018   4003             
+0019   4003 0D 0A 4D 36 BIOS_VERSION:	.BYTE	"\r\nM62 BIOS v2.0.0\r\n", EOS
+0019   4007 32 20 42 49 
+0019   400B 4F 53 20 76 
+0019   400F 32 2E 30 2E 
+0019   4013 30 0D 0A 00 
+0020   4017 4D 61 72 63 BUILD_DATE:		.BYTE	"March 2nd 2020\r\n", EOS
+0020   401B 68 20 32 6E 
+0020   401F 64 20 32 30 
+0020   4023 32 30 0D 0A 
+0020   4027 00 
+0021   4028             
+0022   4028             OSIMAGE:		
+0023   4028 31 FF 7F    					LD		SP,$7FFF		; Load the stack pointer for stack operations.
+0024   402B 21 03 40    					LD		HL, BIOS_VERSION
+0025   402E CD 03 60    					CALL	PUTS
+0026   4031 21 17 40    					LD		HL, BUILD_DATE
+0027   4034 CD 03 60    					CALL	PUTS
+0028   4037 21 00 77    					LD		HL, conaddr
+0029   403A 36 08       					LD		(HL), $08		; Default console port
+0030   403C 21 01 77    					LD		HL, cfaddr
+0031   403F 36 30       					LD		(HL), $30		; Default CF port
+0032   4041 CD 0C 63    					CALL	START_CLI
+0033   4044 76          					HALT
+0034   4045             
+0035   4045             
+0036   4045             
+0037   4045             #INCLUDE	"jmptbl.asm"				; Jump table
+0001+  4045             ;*************************************
+0002+  4045             ; M62 BIOS 2
+0003+  4045             ;*************************************
+0004+  4045             ; jmptbl.asm - BIOS 2 Jump Table
+0005+  4045             ;************************************
+0006+  6000             .ORG $6000
+0007+  6000             
+0008+  6000             ; Standard I/O Routines
+0009+  6000 C3 15 61    PUTC:					JP _PUTC					; Write Character from A to standard output
+0010+  6003 C3 12 61    PUTS:					JP _PUTS					; Write ASCIIZ String pointed to by HL to standard output
+0011+  6006 C3 D7 60    GETC:					JP _GETC					; Read Character from standard input into A
+0012+  6009 C3 54 61    TO_UPPER:				JP _TO_UPPER				; Make the lower case character in A upper case
+0013+  600C C3 1C 61    PRINT_NEW_LINE:			JP _PRINT_NEW_LINE			; Send new line characters (CR+LF) to standard output
+0014+  600F C3 5D 61    CHAR_ISHEX:				JP _CHAR_ISHEX				; C Flag is set if the character in A is hex
+0015+  6012 C3 DB 60    GET_HEX_NIB:			JP _GET_HEX_NIB				; Get single hex digit, store in lower nibble of A from standard input
+0016+  6015 C3 F6 60    GET_HEX_BYTE			JP _GET_HEX_BYTE			; Get hex byte, stores in A from standard input
+0017+  6018 C3 07 61    GET_HEX_WORD:			JP _GET_HEX_WORD			; Get hex word, stores in HL from standard input
+0018+  601B C3 25 61    PRINT_HEX_NIB:			JP _PRINT_HEX_NIB			; Send hex character of lower nibble of A to standard output
+0019+  601E C3 36 61    PRINT_HEX_BYTE:			JP _PRINT_HEX_BYTE			; Send hex character pairs of value in A to standard output
+0020+  6021 C3 47 61    PRINT_HEX_WORD:			JP _PRINT_HEX_WORD			; Send 4 character hex word in HL to standard output
+0021+  6024             
+0022+  6024             ; UART Routines
+0023+  6024 C3 51 60    UART_INIT:				JP _UART_INIT
+0024+  6027 C3 73 60    UART_PRNT_STR:			JP _UART_PRNT_STR
+0025+  602A C3 85 60    UART_TX_RDY:			JP _UART_TX_RDY
+0026+  602D C3 9A 60    UART_TX:				JP _UART_TX
+0027+  6030 C3 A6 60    UART_RX_RDY:			JP _UART_RX_RDY
+0028+  6033 C3 BB 60    UART_RX:				JP _UART_RX
+0029+  6036             
+0030+  6036             ; Delay Routine
+0031+  6036 C3 80 61    loopDELAY:  			JP _loopDELAY
+0032+  6039 C3 1A 62    STRCMP:					JP _STRCMP					; Compares 2 strings (In: HL, DE address of strings, A = # of chars, Out: A = FF if match)
+0033+  603C             
+0034+  603C             ; Math Routines
+0035+  603C C3 8B 61    MULT_8:					JP _MULT_8					; Multiply 8-bit values (In:  Multiply H with E, Out: HL = result)
+0036+  603F C3 97 61    MULT_12:				JP _MULT_12					; Multiply 8-bit value with a 16-bit value (In: Multiply A with DE, Out: HL = result)
+0037+  6042 C3 A3 61    MULT_16:				JP _MULT_16					; Multiply 16-bit values (with 16-bit result) (In: Multiply BC with DE, Out: HL = result)
+0038+  6045 C3 B0 61    MULT_32:				JP _MULT_32					; Multiply 16-bit values (with 32-bit result) (In: Multiply BC with DE, Out: BCHL = result)
+0039+  6048 C3 C9 61    DIV_8:					JP _DIV_8					; Divide 8-bit values (In: Divide E by divider C, Out: A = result, B = rest)
+0040+  604B C3 DA 61    DIV_16:					JP _DIV_16					; Divide 16-bit values (with 16-bit result) (In: Divide BC by divider DE, Out: BC = result, HL = rest)
+0041+  604E C3 00 62    SQRT_16:				JP _SQRT_16					; Square root of 16-bit value (In:  HL = value, Out:  D = result (rounded down))
+0038   6051             
+0039   6051             #INCLUDE	"drivers/16C550.asm"		; 16C550 UART driver
+0001+  6051             ;*************************************
+0002+  6051             ; M62 BIOS
+0003+  6051             ;*************************************
+0004+  6051             ; 16C550uart.asm - 16C550 UART Driver
+0005+  6051             ;************************************
+0006+  6051             ; Much taken from Matt Cook's code
+0007+  6051             ; Changed to take the UART base address from "conaddr"
+0008+  6051             
+0009+  6051             ;***************************************************************************
+0010+  6051             ;UART_INIT
+0011+  6051             ;Function: Initialize the UART to BAUD Rate 9600 (4 MHz clock input)
+0012+  6051             ;***************************************************************************
+0013+  6051             _UART_INIT:
+0014+  6051 21 00 77    			LD		HL, conaddr
+0015+  6054 4E          			LD		C, (HL)
+0016+  6055 0C          			INC		C
+0017+  6056 0C          			INC		C
+0018+  6057 0C          			INC		C
+0019+  6058 3E 80                   LD		A,$80				;Mask to Set DLAB Flag
+0020+  605A ED 79       			OUT		(C),A
+0021+  605C 3E 1A       			LD     	A,26 
+0022+  605E 4E          			LD		C, (HL)
+0023+  605F ED 79       			OUT    	(C),A			;Set BAUD rate to 9600
+0024+  6061 3E 00       			LD     	A,00
+0025+  6063 0C          			INC		C
+0026+  6064 ED 79       			OUT    	(C),A			;Set BAUD rate to 9600
+0027+  6066 3E 03       			LD     	A,$03
+0028+  6068 0C          			INC		C
+0029+  6069 0C          			INC		C
+0030+  606A ED 79       			OUT    	(C),A			;Set 8-bit data, 1 stop bit, reset DLAB Flag
+0031+  606C 3E 01       			LD	   	A,$01
+0032+  606E 4E          			LD		C, (HL)
+0033+  606F 0C          			INC		C
+0034+  6070 ED 79       			OUT    	(C),A			;Enable receive data available interrupt only
+0035+  6072 C9          			RET		
+0036+  6073             		
+0037+  6073             ;***************************************************************************
+0038+  6073             ;UART_PRNT_STR:
+0039+  6073             ;Function: Print out string starting at MEM location (HL) to 16550 UART
+0040+  6073             ;***************************************************************************
+0041+  6073             _UART_PRNT_STR:
+0042+  6073 F5          			PUSH	AF
+0043+  6074 E5          			PUSH	HL
+0044+  6075             UART_PRNT_STR_LP:
+0045+  6075 7E          			LD		A,(HL)
+0046+  6076 FE 00                   CP		EOS					;Test for end byte
+0047+  6078 CA 82 60                JP		Z,UART_END_PRNT_STR	;Jump if end byte is found
+0048+  607B CD 9A 60    			CALL	_UART_TX		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; UART_TX
+0049+  607E 23                      INC		HL					;Increment pointer to next char
+0050+  607F C3 75 60                JP		UART_PRNT_STR_LP	;Transmit loop
+0051+  6082             UART_END_PRNT_STR:
+0052+  6082 E1          			POP		HL
+0053+  6083 F1          			POP		AF
+0054+  6084 C9          			RET	 
+0055+  6085             			 	
+0056+  6085             ;***************************************************************************
+0057+  6085             ;UART_TX_READY
+0058+  6085             ;Function: Check if UART is ready to transmit
+0059+  6085             ;***************************************************************************
+0060+  6085             _UART_TX_RDY:
+0061+  6085 F5          			PUSH 	AF
+0062+  6086 E5          			PUSH	HL
+0063+  6087             UART_TX_RDY_LP:	
+0064+  6087 21 00 77    			LD		HL, conaddr
+0065+  608A 4E          			LD		C, (HL)
+0066+  608B 0C          			INC		C
+0067+  608C 0C          			INC		C
+0068+  608D 0C          			INC		C
+0069+  608E 0C          			INC		C
+0070+  608F 0C          			INC		C
+0071+  6090 ED 78       			IN		A,(C)			;Fetch the control register
+0072+  6092 CB 6F       			BIT 	5,A					;Bit will be set if UART is ready to send
+0073+  6094 CA 87 60    			JP		Z,UART_TX_RDY_LP		
+0074+  6097 E1          			POP		HL
+0075+  6098 F1          			POP     AF
+0076+  6099 C9          			RET
+0077+  609A             	
+0078+  609A             ;***************************************************************************
+0079+  609A             ;UART_TX
+0080+  609A             ;Function: Transmit character in A to UART
+0081+  609A             ;***************************************************************************
+0082+  609A             _UART_TX:
+0083+  609A E5          			PUSH	HL
+0084+  609B CD 85 60    			CALL  _UART_TX_RDY	;;;;; UART_TX_RDY			;Make sure UART is ready to receive
+0085+  609E 21 00 77    			LD		HL, conaddr
+0086+  60A1 4E          			LD		C, (HL)
+0087+  60A2 ED 79       			OUT   (C),A				;Transmit character in A to UART
+0088+  60A4 E1          			POP		HL
+0089+  60A5 C9          			RET
+0090+  60A6             				
+0091+  60A6             ;***************************************************************************
+0092+  60A6             ;UART_RX_READY
+0093+  60A6             ;Function: Check if UART is ready to receive
+0094+  60A6             ;***************************************************************************
+0095+  60A6             _UART_RX_RDY:
+0096+  60A6 F5          			PUSH 	AF	
+0097+  60A7 E5          			PUSH	HL				
+0098+  60A8             UART_RX_RDY_LP:			
+0099+  60A8 21 00 77    			LD		HL, conaddr
+0100+  60AB 4E          			LD		C, (HL)
+0101+  60AC 0C          			INC		C
+0102+  60AD 0C          			INC		C
+0103+  60AE 0C          			INC		C
+0104+  60AF 0C          			INC		C
+0105+  60B0 0C          			INC		C
+0106+  60B1 ED 78       			IN		A,(C)			;Fetch the control register
+0107+  60B3 CB 47       			BIT 	0,A					;Bit will be set if UART is ready to receive
+0108+  60B5 CA A8 60    			JP		Z,UART_RX_RDY_LP		
+0109+  60B8 E1          			POP		HL
+0110+  60B9 F1          			POP     AF
+0111+  60BA C9          			RET
+0112+  60BB             	
+0113+  60BB             ;***************************************************************************
+0114+  60BB             ;UART_RX
+0115+  60BB             ;Function: Receive character in UART to A
+0116+  60BB             ;***************************************************************************
+0117+  60BB             _UART_RX:
+0118+  60BB E5          			PUSH	HL				
+0119+  60BC CD A6 60    			CALL  _UART_RX_RDY			;;;;;;;  UART_RX_RDY			;Make sure UART is ready to receive
+0120+  60BF 21 00 77    			LD		HL, conaddr
+0121+  60C2 4E          			LD		C, (HL)
+0122+  60C3 ED 78       			IN    A,(C)				;Receive character in UART to A
+0123+  60C5 E1          			POP		HL
+0124+  60C6 C9          			RET			
+0040   60C7             #INCLUDE	"core/console.asm"			; console routines
+0001+  60C7             ;*************************************
+0002+  60C7             ; M62 BIOS 2
+0003+  60C7             ;*************************************
+0004+  60C7             ; console.asm - BIOS 2 Console Routines
+0005+  60C7             ;************************************
+0006+  60C7             
+0007+  60C7             ; Console values
+0008+  60C7             EOS:				.EQU	$00							; Null Character (End Of String)
+0009+  60C7             CR:					.EQU	$0D							; Carriage Return
+0010+  60C7             LF:					.EQU	$0A							; Line Feed
+0011+  60C7             
+0012+  60C7 1B 5B 66 1B CLS_STRING:			.BYTE	ESC,"[f",ESC,"[2J",EOS		; Printing this screen to the terminal will clear the screen and return the cursor to the top left of the screen.
+0012+  60CB 5B 32 4A 00 
+0013+  60CF 1B 5B 66 5D CLEAR_STRING:		.BYTE	ESC,"[f]"
+0014+  60D3 1B 5B 32 4A HOME_STRING:		.BYTE	ESC,"[2J"
+0015+  60D7             BS:					.EQU	$08							; Backspace character
+0016+  60D7             ESC:				.EQU	$1B							; Escape character
+0017+  60D7             
+0018+  60D7             ;***************************************************************************
+0019+  60D7             ;GET_CHAR
+0020+  60D7             ;Function: Get ASCII character from user into Accumulator
+0021+  60D7             ;***************************************************************************			
+0022+  60D7             _GETC:
+0023+  60D7 CD BB 60    			CALL	_UART_RX				;Get char into Acc
+0024+  60DA C9          			RET
+0025+  60DB             			
+0026+  60DB             ;***************************************************************************
+0027+  60DB             ;GET_HEX_NIBBLE
+0028+  60DB             ;Function: Translates char to HEX nibble in bottom 4 bits of A
+0029+  60DB             ;***************************************************************************
+0030+  60DB             _GET_HEX_NIB:      
+0031+  60DB CD D7 60    			CALL	_GETC
+0032+  60DE CD 54 61    			CALL	_TO_UPPER			;Character has to be upper case
+0033+  60E1 CD 5D 61                CALL    _CHAR_ISHEX      	;Is it a hex digit?
+0034+  60E4 D2 DB 60                JP      NC,_GET_HEX_NIB  	;Yes - Jump / No - Continue
+0035+  60E7 CD 15 61    			CALL    _PUTC
+0036+  60EA FE 3A       			CP      '9' + 1         	;Is it a digit less or equal '9' + 1?
+0037+  60EC DA F1 60                JP      C,_GET_HEX_NIB_1 	;Yes - Jump / No - Continue
+0038+  60EF D6 07                   SUB     $07             	;Adjust for A-F digits
+0039+  60F1             _GET_HEX_NIB_1:                
+0040+  60F1 D6 30       			SUB     '0'             	;Subtract to get nib between 0->15
+0041+  60F3 E6 0F                   AND     $0F             	;Only return lower 4 bits
+0042+  60F5 C9                      RET	
+0043+  60F6             				
+0044+  60F6             ;***************************************************************************
+0045+  60F6             ;GET_HEX_BTYE
+0046+  60F6             ;Function: Gets HEX byte into A
+0047+  60F6             ;***************************************************************************
+0048+  60F6             _GET_HEX_BYTE:
+0049+  60F6 CD DB 60                CALL    _GET_HEX_NIB			;Get high nibble
+0050+  60F9 CB 07                   RLC     A					;Rotate nibble into high nibble
+0051+  60FB CB 07                   RLC     A
+0052+  60FD CB 07                   RLC     A
+0053+  60FF CB 07                   RLC     A
+0054+  6101 47                      LD      B,A					;Save upper four bits
+0055+  6102 CD DB 60                CALL    _GET_HEX_NIB			;Get lower nibble
+0056+  6105 B0                      OR      B					;Combine both nibbles
+0057+  6106 C9                      RET				
+0058+  6107             			
+0059+  6107             ;***************************************************************************
+0060+  6107             ;GET_HEX_WORD
+0061+  6107             ;Function: Gets two HEX bytes into HL
+0062+  6107             ;***************************************************************************
+0063+  6107             _GET_HEX_WORD:
+0064+  6107 F5          			PUSH    AF
+0065+  6108 CD F6 60                CALL    _GET_HEX_BYTE		;Get high byte
+0066+  610B 67                      LD		H,A
+0067+  610C CD F6 60                CALL    _GET_HEX_BYTE    	;Get low byte
+0068+  610F 6F                      LD      L,A
+0069+  6110 F1                      POP     AF
+0070+  6111 C9                      RET
+0071+  6112             ;***************************************************************************
+0072+  6112             ;PRINT_STRING
+0073+  6112             ;Function: Prints string to terminal program
+0074+  6112             ;***************************************************************************
+0075+  6112             _PUTS:
+0076+  6112 C3 27 60    			JP		UART_PRNT_STR
+0077+  6115             ;			CALL    UART_PRNT_STR
+0078+  6115             ;			RET
+0079+  6115             			
+0080+  6115             ;***************************************************************************
+0081+  6115             ;PRINT_CHAR
+0082+  6115             ;Function: Get upper case ASCII character from Accumulator to UART
+0083+  6115             ;***************************************************************************			
+0084+  6115             _PUTC:
+0085+  6115 CD 2D 60    			CALL	UART_TX				;Echo character to terminal
+0086+  6118 C9          			RET			
+0087+  6119             			
+0088+  6119             ;***************************************************************************
+0089+  6119             ;PRINT_NEW_LINE
+0090+  6119             ;Function: Prints carriage return and line feed
+0091+  6119             ;***************************************************************************			
+0092+  6119             
+0093+  6119 0D 0A 00    NEW_LINE_STRING: 	.BYTE "\r\n",EOS
+0094+  611C             
+0095+  611C             _PRINT_NEW_LINE:
+0096+  611C E5          			PUSH	HL
+0097+  611D 21 19 61    			LD 		HL,NEW_LINE_STRING			
+0098+  6120 CD 03 60    			CALL    PUTS			
+0099+  6123 E1          			POP		HL
+0100+  6124 C9          			RET
+0101+  6125             			
+0102+  6125             ;***************************************************************************
+0103+  6125             ;PRINT_HEX_NIB
+0104+  6125             ;Function: Prints a low nibble in hex notation from Acc to the serial line.
+0105+  6125             ;***************************************************************************
+0106+  6125             _PRINT_HEX_NIB:
+0107+  6125 F5          			PUSH 	AF
+0108+  6126 E6 0F                   AND     $0F             	;Only low nibble in byte
+0109+  6128 C6 30                   ADD     A,'0'             	;Adjust for char offset
+0110+  612A FE 3A                   CP      '9' + 1         	;Is the hex digit > 9?
+0111+  612C DA 31 61                JP      C,_PRINT_HEX_NIB_1	;Yes - Jump / No - Continue
+0112+  612F C6 07                   ADD     A,'A' - '0' - $0A 	;Adjust for A-F
+0113+  6131             _PRINT_HEX_NIB_1:
+0114+  6131 CD 15 61    			CALL	_PUTC        	;Print the nibble
+0115+  6134 F1          			POP		AF
+0116+  6135 C9          			RET
+0117+  6136             				
+0118+  6136             ;***************************************************************************
+0119+  6136             ;PRINT_HEX_BYTE
+0120+  6136             ;Function: Prints a byte in hex notation from Acc to the serial line.
+0121+  6136             ;***************************************************************************		
+0122+  6136             _PRINT_HEX_BYTE:
+0123+  6136 F5          			PUSH	AF					;Save registers
+0124+  6137 C5                      PUSH    BC
+0125+  6138 47                      LD		B,A					;Save for low nibble
+0126+  6139 0F                      RRCA						;Rotate high nibble into low nibble
+0127+  613A 0F          			RRCA
+0128+  613B 0F          			RRCA
+0129+  613C 0F          			RRCA
+0130+  613D CD 25 61                CALL    _PRINT_HEX_NIB		;Print high nibble
+0131+  6140 78                      LD		A,B					;Restore for low nibble
+0132+  6141 CD 25 61                CALL    _PRINT_HEX_NIB		;Print low nibble
+0133+  6144 C1                      POP     BC					;Restore registers
+0134+  6145 F1                      POP		AF
+0135+  6146 C9          			RET
+0136+  6147             			
+0137+  6147             ;***************************************************************************
+0138+  6147             ;PRINT_HEX_WORD
+0139+  6147             ;Function: Prints the four hex digits of a word to the serial line from HL
+0140+  6147             ;***************************************************************************
+0141+  6147             _PRINT_HEX_WORD:     
+0142+  6147 E5          			PUSH 	HL
+0143+  6148 F5                      PUSH	AF
+0144+  6149 7C                      LD		A,H
+0145+  614A CD 36 61    			CALL	_PRINT_HEX_BYTE		;Print high byte
+0146+  614D 7D                      LD		A,L
+0147+  614E CD 36 61                CALL    _PRINT_HEX_BYTE		;Print low byte
+0148+  6151 F1                      POP		AF
+0149+  6152 E1          			POP		HL
+0150+  6153 C9                      RET			
+0151+  6154             ;*****************************************************************************
+0152+  6154             ; STRCMP	- STRing CoMPare - compares 2 strings
+0153+  6154             ;*****************************************************************************
+0154+  6154             ; Entry:
+0155+  6154             ;		HL and DE	= Address of strings to compare
+0156+  6154             ;		A			= Number of chars to compare
+0157+  6154             ; Return:
+0158+  6154             ;		A			= FF if strings match, any other value means they didn't
+0159+  6154             ;*****************************************************************************
+0160+  6154             ; By Peter Murray
+0161+  6154             ; https://www.m62.ca
+0162+  6154             ;*****************************************************************************
+0163+  6154             ;_STRCMP:
+0164+  6154             ;			PUSH	BC
+0165+  6154             ;			LD		B, $00
+0166+  6154             ;			LD		C, A
+0167+  6154             ;_SC_LOOP:	LD		A, (DE)
+0168+  6154             ;			CPI
+0169+  6154             ;			JP		NZ, _SC_DONE
+0170+  6154             ;			LD		A, C
+0171+  6154             ;			CP		$FF
+0172+  6154             ;			INC		DE
+0173+  6154             ;			JP		NZ, _SC_LOOP
+0174+  6154             ;_SC_DONE:	LD		A, C
+0175+  6154             ;			POP		BC
+0176+  6154             ;			RET
+0177+  6154             
+0178+  6154             ;***************************************************************************
+0179+  6154             ;TO_UPPER
+0180+  6154             ;Function: Convert character in Accumulator to upper case
+0181+  6154             ;***************************************************************************
+0182+  6154             ; By Matt Cook
+0183+  6154             ; https://z80project.wordpress.com/author/matthewcook6254/
+0184+  6154             ;***************************************************************************		
+0185+  6154             _TO_UPPER:       
+0186+  6154 FE 61       			CP      'a'             	; Nothing to do if not lower case
+0187+  6156 D8                      RET     C
+0188+  6157 FE 7B                   CP      'z' + 1         	; > 'z'?
+0189+  6159 D0                      RET     NC              	; Nothing to do, either
+0190+  615A E6 5F                   AND     $5F             	; Convert to upper case
+0191+  615C C9                      RET		
+0192+  615D             			
+0193+  615D             
+0194+  615D             ;***************************************************************************
+0195+  615D             ;CHAR_ISHEX
+0196+  615D             ;Function: Checks if value in A is a hexadecimal digit, C flag set if true
+0197+  615D             ;***************************************************************************		
+0198+  615D             ; By Matt Cook
+0199+  615D             ; https://z80project.wordpress.com/author/matthewcook6254/
+0200+  615D             ;***************************************************************************		
+0201+  615D             _CHAR_ISHEX:         
+0202+  615D             										;Checks if Acc between '0' and 'F'
+0203+  615D FE 47       			CP      'F' + 1       		;(Acc) > 'F'? 
+0204+  615F D0                      RET     NC              	;Yes - Return / No - Continue
+0205+  6160 FE 30                   CP      '0'             	;(Acc) < '0'?
+0206+  6162 D2 67 61                JP      NC,_CHAR_ISHEX_1 	;Yes - Jump / No - Continue
+0207+  6165 3F                      CCF                     	;Complement carry (clear it)
+0208+  6166 C9                      RET
+0209+  6167             _CHAR_ISHEX_1:       
+0210+  6167             										;Checks if Acc below '9' and above 'A'
+0211+  6167 FE 3A       			CP      '9' + 1         	;(Acc) < '9' + 1?
+0212+  6169 D8                      RET     C               	;Yes - Return / No - Continue (meaning Acc between '0' and '9')
+0213+  616A FE 41                   CP      'A'             	;(Acc) > 'A'?
+0214+  616C D2 71 61                JP      NC,_CHAR_ISHEX_2 	;Yes - Jump / No - Continue
+0215+  616F 3F                      CCF                     	;Complement carry (clear it)
+0216+  6170 C9                      RET
+0217+  6171             _CHAR_ISHEX_2:        
+0218+  6171             										;Only gets here if Acc between 'A' and 'F'
+0219+  6171 37          			SCF                     	;Set carry flag to indicate the char is a hex digit
+0220+  6172 C9                      RET
+0221+  6173             			
+0222+  6173             _CLRSCR:
+0223+  6173 21 CF 60    			LD		HL, CLEAR_STRING
+0224+  6176 CD 12 61    			CALL	_PUTS
+0225+  6179 21 D3 60    			LD		HL, HOME_STRING
+0226+  617C CD 12 61    			CALL	_PUTS
+0227+  617F C9          			RET
+0228+  6180             			0041   6180             #INCLUDE	"core/delays.asm"			; delay routines
+0001+  6180             ;*****************************
+0002+  6180             ; routine_entry.asm
+0003+  6180             ;*****************************
+0004+  6180             ; Created by Don Prefontaine
+0005+  6180             ;*****************************
+0006+  6180             ; Delay values
+0007+  6180             DELAY_FIFTY:		.EQU	0105h						; 50us
+0008+  6180             DELAY_HUNDRED:		.EQU	0110h						; 100us
+0009+  6180             DELAY_THOUSAND:		.EQU	01B6h						; 1000us
+0010+  6180             DELAY_HALF64K:		.EQU	7FFFh						; 179ms
+0011+  6180             DELAY_FULL64K:		.EQU	0FFFFh						; 360ms
+0012+  6180             DELAY_SCROLL:		.EQU	3FFFh						; 89ms. Used to slow-scroll an LCD display.
+0013+  6180             DELAY_DINCER:		.EQU	0220h						; 1.6ms. Used by Dincer Aydin for one of his LCD initialization routines.
+0014+  6180             
+0015+  6180             ;********************
+0016+  6180             ; BIOS routine
+0017+  6180             ;********************
+0018+  6180             _loopDELAY:  				
+0019+  6180 00          		NOP
+0020+  6181 00          		NOP
+0021+  6182 2D                  DEC L
+0022+  6183 C2 36 60            JP NZ, loopDELAY
+0023+  6186 25                  DEC H
+0024+  6187 C2 36 60            JP NZ, loopDELAY
+0025+  618A C9                  RET            
+0026+  618B             
+0027+  618B             ;********************
+0028+  618B             ; Coding example
+0029+  618B             ;********************
+0030+  618B             ;		LD	HL,	DELAY_DINCER
+0031+  618B             ;		CALL	loopDELAY0042   618B             #INCLUDE	"core/math.asm"				; math routines
+0001+  618B             ;************************************************************************************
+0002+  618B             ; math.asm
+0003+  618B             ;************************************************************************************
+0004+  618B             ; Set of Math routines
+0005+  618B             ;	These have been borrowed from resources on the internet,
+0006+  618B             ;	I have put a link of their sources and attributed to the name I could find.
+0007+  618B             ;************************************************************************************
+0008+  618B             ; I intend to write my own versions of these routines at a later date
+0009+  618B             ;************************************************************************************
+0010+  618B             
+0011+  618B             ;************************************************************************************
+0012+  618B             ;Multiply 8-bit values
+0013+  618B             ;************************************************************************************
+0014+  618B             ;In:  Multiply H with E
+0015+  618B             ;Out: HL = result
+0016+  618B             ;************************************************************************************
+0017+  618B             ; by Grauw
+0018+  618B             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0019+  618B             ;************************************************************************************
+0020+  618B 16 00       _MULT_8:	LD		D, $00
+0021+  618D 6A          			LD		L, D
+0022+  618E 06 08       			LD		B, $08
+0023+  6190             _MULT_8_LOOP:
+0024+  6190 29          			ADD		HL, HL
+0025+  6191 30 01       			JR		NC, _MULT_8_NOADD
+0026+  6193 19          			ADD		HL, DE
+0027+  6194             _MULT_8_NOADD:
+0028+  6194 10 FA       			DJNZ	_MULT_8_LOOP
+0029+  6196 C9          			RET
+0030+  6197             
+0031+  6197             ;************************************************************************************
+0032+  6197             ;Multiply 8-bit value with a 16-bit value
+0033+  6197             ;************************************************************************************
+0034+  6197             ;In: Multiply A with DE
+0035+  6197             ;Out: HL = result
+0036+  6197             ;************************************************************************************
+0037+  6197             ; by Grauw
+0038+  6197             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0039+  6197             ;************************************************************************************
+0040+  6197 2E 00       _MULT_12:	LD		L, $00
+0041+  6199 06 08       			LD		B, $08
+0042+  619B             _MULT_12_LOOP:
+0043+  619B 29          			ADD		HL, HL
+0044+  619C 87          			ADD		A, A
+0045+  619D 30 01       			JR		NC, _MULT_12_NOADD
+0046+  619F 19          			ADD		HL, DE
+0047+  61A0             _MULT_12_NOADD:
+0048+  61A0 10 F9       			DJNZ	_MULT_12_LOOP
+0049+  61A2 C9          			RET
+0050+  61A3             
+0051+  61A3             ;************************************************************************************
+0052+  61A3             ;Multiply 16-bit values (with 16-bit result)
+0053+  61A3             ;************************************************************************************
+0054+  61A3             ;In: Multiply BC with DE
+0055+  61A3             ;Out: HL = result
+0056+  61A3             ;************************************************************************************
+0057+  61A3             ; by Grauw
+0058+  61A3             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0059+  61A3             ;************************************************************************************
+0060+  61A3 78          _MULT_16:	LD		A, B
+0061+  61A4 06 10       			LD		B, $10
+0062+  61A6             _MULT_16_LOOP:
+0063+  61A6 29          			ADD		HL, HL
+0064+  61A7 CB 21       			SLA		C
+0065+  61A9 17          			RLA
+0066+  61AA 30 01       			JR		NC, _MULT_16_NOADD
+0067+  61AC 19          			ADD		HL, DE
+0068+  61AD             _MULT_16_NOADD:
+0069+  61AD 10 F7       			DJNZ	_MULT_16_LOOP
+0070+  61AF C9          			RET
+0071+  61B0             
+0072+  61B0             ;************************************************************************************
+0073+  61B0             ;Multiply 16-bit values (with 32-bit result)
+0074+  61B0             ;************************************************************************************
+0075+  61B0             ;In: Multiply BC with DE
+0076+  61B0             ;Out: BCHL = result
+0077+  61B0             ;************************************************************************************
+0078+  61B0             ; by Grauw
+0079+  61B0             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0080+  61B0             ;************************************************************************************
+0081+  61B0 79          _MULT_32:	LD		A, C
+0082+  61B1 48          			LD		C, B
+0083+  61B2 21 00 00    			LD		HL, $00
+0084+  61B5 06 10       			LD		B, $10
+0085+  61B7             _MULT_32_LOOP:
+0086+  61B7 29          			ADD		HL, HL
+0087+  61B8 17          			RLA
+0088+  61B9 CB 11       			RL		C
+0089+  61BB 30 07       			JR		NC, _MULT_32_NOADD
+0090+  61BD 19          			ADD		HL, DE
+0091+  61BE CE 00       			ADC		A, $00
+0092+  61C0 D2 C4 61    			JP		NC, _MULT_32_NOADD
+0093+  61C3 0C          			INC		C
+0094+  61C4             _MULT_32_NOADD:
+0095+  61C4 10 F1       			DJNZ	_MULT_32_LOOP
+0096+  61C6 41          			LD		B, C
+0097+  61C7 4F          			LD		C, A
+0098+  61C8 C9          			RET
+0099+  61C9             
+0100+  61C9             
+0101+  61C9             ;************************************************************************************
+0102+  61C9             ;Divide 8-bit values
+0103+  61C9             ;************************************************************************************
+0104+  61C9             ;In: Divide E by divider C
+0105+  61C9             ;Out: A = result, B = rest
+0106+  61C9             ;************************************************************************************
+0107+  61C9             ; by Grauw
+0108+  61C9             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0109+  61C9             ;************************************************************************************
+0110+  61C9 AF          _DIV_8:		XOR		A
+0111+  61CA 06 08       			LD		B, $08
+0112+  61CC             _DIV_8_LOOP:
+0113+  61CC CB 13       			RL		E
+0114+  61CE 17          			RLA
+0115+  61CF 91          			SUB		C
+0116+  61D0 30 01       			JR		NC, _DIV_8_NOADD
+0117+  61D2 81          			ADD		A, C
+0118+  61D3             _DIV_8_NOADD:
+0119+  61D3 10 F7       			DJNZ	_DIV_8_LOOP
+0120+  61D5 47          			LD		B, A
+0121+  61D6 7B          			LD		A, E
+0122+  61D7 17          			RLA
+0123+  61D8 2F          			CPL
+0124+  61D9 C9          			RET
+0125+  61DA             
+0126+  61DA             ;************************************************************************************
+0127+  61DA             ;Divide 16-bit values (with 16-bit result)
+0128+  61DA             ;************************************************************************************
+0129+  61DA             ;In: Divide BC by divider DE
+0130+  61DA             ;Out: BC = result, HL = rest
+0131+  61DA             ;************************************************************************************
+0132+  61DA             ; by Grauw
+0133+  61DA             ; based on code at http://map.grauw.nl/articles/mult_div_shifts.php
+0134+  61DA             ;************************************************************************************
+0135+  61DA 21 00 00    _DIV_16:	LD		HL, $00
+0136+  61DD 78          			LD		A, B
+0137+  61DE 06 08       			LD		B, $08
+0138+  61E0             _DIV_16_LOOP1:
+0139+  61E0 17          			RLA
+0140+  61E1 ED 6A       			ADC		HL, HL
+0141+  61E3 ED 52       			SBC		HL, DE
+0142+  61E5 30 01       			JR		NC, _DIV_16_NOADD1
+0143+  61E7 19          			ADD		HL, DE
+0144+  61E8             _DIV_16_NOADD1:
+0145+  61E8 10 F6       			DJNZ	_DIV_16_LOOP1
+0146+  61EA 17          			RLA
+0147+  61EB 2F          			CPL
+0148+  61EC 47          			LD		B, A
+0149+  61ED 79          			LD		A, C
+0150+  61EE 48          			LD		C, B
+0151+  61EF 06 08       			LD		B, $08
+0152+  61F1             _DIV_16_LOOP2:
+0153+  61F1 17          			RLA
+0154+  61F2 ED 6A       			ADC		HL, HL
+0155+  61F4 ED 52       			SBC		HL, DE
+0156+  61F6 30 01       			JR		NC, _DIV_16_NOADD2
+0157+  61F8 19          			ADD		HL, DE
+0158+  61F9             _DIV_16_NOADD2:
+0159+  61F9 10 F6       			DJNZ	_DIV_16_LOOP2
+0160+  61FB 17          			RLA
+0161+  61FC 2F          			CPL
+0162+  61FD 41          			LD		B, C
+0163+  61FE 4F          			LD		C, A
+0164+  61FF C9          			RET
+0165+  6200             	
+0166+  6200             	
+0167+  6200             ;************************************************************************************
+0168+  6200             ;Square root of 16-bit value
+0169+  6200             ;************************************************************************************
+0170+  6200             ;In:  HL = value
+0171+  6200             ;Out:  D = result (rounded down)
+0172+  6200             ;************************************************************************************
+0173+  6200             ; written by Ricardo Bittencourt
+0174+  6200             ; http://www.cpcwiki.eu/index.php/Programming:Square_Root
+0175+  6200             ; and https://www.msx.org/news/websites/en/msx-assembly-page-update-0
+0176+  6200             ;************************************************************************************
+0177+  6200 11 40 00    _SQRT_16:	LD		DE, $0040
+0178+  6203 7D          			LD		A, L
+0179+  6204 6C          			LD		L, H
+0180+  6205 62          			LD		H, D
+0181+  6206 B7          			OR		A
+0182+  6207 06 08       			LD		B, 8
+0183+  6209             _SQRT_16_LOOP:
+0184+  6209 ED 52       			SBC		HL, DE
+0185+  620B 30 01       			JR		NC, _SQRT_16_SKIP
+0186+  620D 19          			ADD		HL, DE
+0187+  620E             _SQRT_16_SKIP:
+0188+  620E 3F          			CCF
+0189+  620F CB 12       			RL		D
+0190+  6211 87          			ADD		A, A
+0191+  6212 ED 6A       			ADC		HL, HL
+0192+  6214 87          			ADD		A, A
+0193+  6215 ED 6A       			ADC		HL, HL
+0194+  6217 10 F0       			DJNZ	_SQRT_16_LOOP
+0195+  6219 C9          			RET
+0196+  621A             	0043   621A             #INCLUDE	"core/strings.asm"			; strings routines
+0001+  621A             ;**********************************************
+0002+  621A             ; M62 BIOS
+0003+  621A             ;**********************************************
+0004+  621A             ; strings.asm - String routines for the M62-OS
+0005+  621A             ;**********************************************
+0006+  621A             ; All routines in this library were written
+0007+  621A             ; by Peter Murray
+0008+  621A             ; https://www.m62.ca
+0009+  621A             ;**********************************************
+0010+  621A             
+0011+  621A             ;*****************************************************************************
+0012+  621A             ; STRCMP	- STRing CoMPare - compares 2 strings
+0013+  621A             ;*****************************************************************************
+0014+  621A             ; String compare
+0015+  621A             ; Entry: 	
+0016+  621A             ;			HL, DE	: Location of strings to compare
+0017+  621A             ; Exit: 	
+0018+  621A             ;			Z flag set for match, clear for not match
+0019+  621A             ;*****************************************************************************
+0020+  621A E5          _STRCMP:	PUSH	HL
+0021+  621B 1A          _STRCMPL:	LD		A, (DE)
+0022+  621C BE          			CP		(HL)
+0023+  621D C2 2A 62    			JP		NZ, _STRCMPDN
+0024+  6220 FE 00       			CP		$00
+0025+  6222 CA 2A 62    			JP		Z, _STRCMPDN
+0026+  6225 13          			INC		DE
+0027+  6226 23          			INC		HL
+0028+  6227 C3 1B 62    			JP		_STRCMPL
+0029+  622A E1          _STRCMPDN:	POP		HL
+0030+  622B C9          			RET
+0031+  622C             
+0032+  622C 1A          _STRCMPX:	LD		A, (DE)
+0033+  622D BE          			CP		(HL)
+0034+  622E C0          			RET		NZ
+0035+  622F FE 00       			CP		$00
+0036+  6231 C8          			RET		Z
+0037+  6232 13          			INC		DE
+0038+  6233 23          			INC		HL
+0039+  6234 C3 1A 62    			JP		_STRCMP
+0040+  6237             
+0041+  6237             ;*****************************************************************************
+0042+  6237             ; STRISNUM	- Checks if a string is a valid decimal value
+0043+  6237             ;*****************************************************************************
+0044+  6237             ; Is String a decimal number
+0045+  6237             ; Entry: 	
+0046+  6237             ;			HL : Location of string to test
+0047+  6237             ; Exit: 	
+0048+  6237             ;			Z flag set if valid decimal value
+0049+  6237             ;*****************************************************************************
+0050+  6237 E5          _STRISNUM:	PUSH	HL
+0051+  6238 CD 8F 62    			CALL	_STRLEN
+0052+  623B E1          			POP		HL
+0053+  623C 78          			LD		A, B
+0054+  623D FE 00       			CP		$00
+0055+  623F CA 50 62    			JP		Z, infalse
+0056+  6242 7E          i_n_loop:	LD		A, (HL)			; Get the next character
+0057+  6243 FE 00       			CP		$00				; Is it null?
+0058+  6245 C8          			RET		Z
+0059+  6246 FE 30       			CP		'0' ; $30
+0060+  6248 DA 50 62    			JP		C, infalse		; if less than '0' then it's not  number
+0061+  624B FE 3A       			CP		'9'+1 ; $39
+0062+  624D DA 55 62    			JP		C, indonext		; if less/equal to '9' then it is a number
+0063+  6250 3E 01       infalse:	LD		A, $01			; clear Z and return
+0064+  6252 FE 00       			CP		$00
+0065+  6254 C9          			RET
+0066+  6255 23          indonext:	INC		HL
+0067+  6256 C3 42 62    			JP		i_n_loop
+0068+  6259             
+0069+  6259             ;*****************************************************************************
+0070+  6259             ; STRISHEX	- Checks if a string is a valid hex value
+0071+  6259             ;*****************************************************************************
+0072+  6259             ; Is String a hex number
+0073+  6259             ; Entry: 	
+0074+  6259             ;			HL : Location of string to test
+0075+  6259             ; Exit: 	
+0076+  6259             ;			Z flag set if valid hex value
+0077+  6259             ;*****************************************************************************
+0078+  6259 E5          _STRISHEX:	PUSH	HL
+0079+  625A CD 8F 62    			CALL	_STRLEN
+0080+  625D E1          			POP		HL
+0081+  625E 78          			LD		A, B
+0082+  625F FE 00       			CP		$00
+0083+  6261 CA 86 62    			JP		Z, ihfalse
+0084+  6264 7E          i_h_loop:	LD		A, (HL)			; Get the next character
+0085+  6265 FE 00       			CP		$00				; Is it null?
+0086+  6267 C8          			RET		Z
+0087+  6268 FE 30       			CP		'0' ; $30
+0088+  626A DA 86 62    			JP		C, ihfalse		; if less than '0' then it's not a hex number
+0089+  626D FE 3A       			CP		'9'+1 ; $39
+0090+  626F DA 8B 62    			JP		C, ihdonext		; if less/equal to '9' then it is a number so we can loop again
+0091+  6272             			; Add checking of a-f,A-F
+0092+  6272 FE 41       			CP		'A'	; $41
+0093+  6274 DA 86 62    			JP		C, ihfalse		; if less than 'A' then it's not a hex number
+0094+  6277 FE 47       			CP		'F'+1 ; $46
+0095+  6279 DA 8B 62    			JP		C, ihdonext		; if less/equal to 'F' then it is a number so we can loop again
+0096+  627C FE 61       			CP		'a' ; $61
+0097+  627E DA 86 62    			JP		C, ihfalse		; if less than 'a' then it's not a hex number
+0098+  6281 FE 67       			CP		'f'+1 ; $66
+0099+  6283 DA 8B 62    			JP		C, ihdonext		; if less/equal to 'f' then it is a number so we can loop again
+0100+  6286 3E 01       ihfalse:	LD		A, $01			; clear Z and return
+0101+  6288 FE 00       			CP		$00
+0102+  628A C9          			RET
+0103+  628B 23          ihdonext:	INC		HL
+0104+  628C C3 64 62    			JP		i_h_loop
+0105+  628F             
+0106+  628F             ;*****************************************************************************
+0107+  628F             ; STRLEN	- Counts the length of a string
+0108+  628F             ;*****************************************************************************
+0109+  628F             ; String Length
+0110+  628F             ; Entry: 	
+0111+  628F             ;			HL : Location of string to count
+0112+  628F             ; Exit: 	
+0113+  628F             ;			B : length of the string (null terminator is not counted)
+0114+  628F             ;*****************************************************************************
+0115+  628F 06 00       _STRLEN:	LD		B, $00
+0116+  6291 7E          sl_next:	LD		A, (HL)
+0117+  6292 FE 00       			CP		$00
+0118+  6294 C8          			RET		Z
+0119+  6295 04          			INC		B
+0120+  6296 23          			INC		HL
+0121+  6297 C3 91 62    			JP		sl_next			
+0122+  629A             			
+0123+  629A             			
+0124+  629A             
+0125+  629A             ;**********************************************************************************
+0126+  629A             ; STRSUBCNT	- Counts the number of substrings seperated with specificed seperator
+0127+  629A             ;**********************************************************************************
+0128+  629A             ; Entry: 	
+0129+  629A             ;			HL : Location of string to count
+0130+  629A             ;			C  : Seperator character to use
+0131+  629A             ; Exit: 	
+0132+  629A             ;			B  : Stores the number of parameter substrings (command not counted)
+0133+  629A             ;*****************************************************************************
+0134+  629A             _STRSUBCNT:
+0135+  629A 06 00       			LD		B, $00				; set substring counter to 0
+0136+  629C             cs_readnext:
+0137+  629C 3E 00       			LD		A, $00
+0138+  629E BE          			CP		(HL)				; Compare the character with null (are we at the end of the string)
+0139+  629F C8          			RET		Z					; If it's null, we are done
+0140+  62A0 79          			LD		A, C				; Seperator character
+0141+  62A1 BE          			CP		(HL)				; Compare the character with the seperator
+0142+  62A2 C2 A6 62    			JP		NZ, cs_nextchar		; if there isn't a separator we don't increment the counter
+0143+  62A5 04          			INC		B					; Increment substring count
+0144+  62A6             cs_nextchar:
+0145+  62A6 23          			INC		HL
+0146+  62A7 C3 9C 62    			JP		cs_readnext
+0147+  62AA             			
+0148+  62AA             
+0149+  62AA             ;**********************************************************************************
+0150+  62AA             ; STRHEXVAL	- Gets the value of a hex number string (16-Bit max)
+0151+  62AA             ;**********************************************************************************
+0152+  62AA             ; Entry: 	
+0153+  62AA             ;			HL : Location of string to convert (doesn't check validity)
+0154+  62AA             ; Exit: 	
+0155+  62AA             ;			BC : Value of the string (B=MSB,C=LSB) (if <256, B will be 0)
+0156+  62AA             ;*****************************************************************************
+0157+  62AA 01 00 00    _STRHEXVAL:	LD		BC, $0000
+0158+  62AD 7E          _SHV_LOOP:	LD		A, (HL)		; Grab the char
+0159+  62AE FE 00       			CP		$00
+0160+  62B0 C8          			RET		Z			; if null char, we are done
+0161+  62B1 E5          			PUSH	HL			; Store the char location
+0162+  62B2 CD DA 62    			CALL	_CHARTOVAL
+0163+  62B5 5F          			LD		E, A		; Store the val of char in E for now
+0164+  62B6             			; shift B left by 4 and clear lower nibble | A<-B, RLA*4, clear low nibble, B<-A
+0165+  62B6 78          			LD		A, B
+0166+  62B7 17          			RLA
+0167+  62B8 17          			RLA
+0168+  62B9 17          			RLA
+0169+  62BA 17          			RLA
+0170+  62BB 06 F0       			LD		B, $F0
+0171+  62BD A0          			AND		B
+0172+  62BE 47          			LD		B, A
+0173+  62BF             			; copy C to A, right shift by 4 bits and clear top nibble
+0174+  62BF 79          			LD		A, C
+0175+  62C0 1F          			RRA
+0176+  62C1 1F          			RRA
+0177+  62C2 1F          			RRA
+0178+  62C3 1F          			RRA
+0179+  62C4 16 0F       			LD		D, $0F
+0180+  62C6 A2          			AND		D
+0181+  62C7 80          			ADD		A, B
+0182+  62C8 47          			LD		B, A
+0183+  62C9             			; shift C left by 4 and clear lower nibble
+0184+  62C9 79          			LD		A, C
+0185+  62CA 17          			RLA
+0186+  62CB 17          			RLA
+0187+  62CC 17          			RLA
+0188+  62CD 17          			RLA
+0189+  62CE 0E F0       			LD		C, $F0
+0190+  62D0 A1          			AND		C
+0191+  62D1 4F          			LD		C, A
+0192+  62D2             			; Add value of character to C
+0193+  62D2 7B          			LD		A, E	; Get the val of char back
+0194+  62D3 81          			ADD		A, C
+0195+  62D4 4F          			LD		C, A
+0196+  62D5 E1          			POP		HL			; Recall char location
+0197+  62D6 23          			INC		HL			; Next char location
+0198+  62D7 C3 AD 62    			JP		_SHV_LOOP
+0199+  62DA             
+0200+  62DA             
+0201+  62DA             ;**********************************************************************************
+0202+  62DA             ; CHARTOVAL	- Gets the value of a character
+0203+  62DA             ;**********************************************************************************
+0204+  62DA             ; Entry:
+0205+  62DA             ;			A : Char to convert to value
+0206+  62DA             ; Exit: 	
+0207+  62DA             ;			A : Value of that character
+0208+  62DA             ;*****************************************************************************
+0209+  62DA C5          _CHARTOVAL:	PUSH	BC
+0210+  62DB FE 3A       			CP		'9'+1				; Is the char <= '9'?
+0211+  62DD DA EA 62    			JP		C, _CHV_NUM
+0212+  62E0 FE 47       			CP		'G'					; is the char <= 'F'?
+0213+  62E2 DA EF 62    			JP		C, _CHV_UPC
+0214+  62E5 06 57       			LD		B, 'a'-$0A
+0215+  62E7 90          			SUB		B					; Subtract offset from the char to convert to value
+0216+  62E8 C1          			POP		BC
+0217+  62E9 C9          			RET
+0218+  62EA 06 30       _CHV_NUM:	LD		B, '0'
+0219+  62EC 90          			SUB		B					; Subtract offset from the char to convert to value
+0220+  62ED C1          			POP		BC
+0221+  62EE C9          			RET
+0222+  62EF 06 37       _CHV_UPC:	LD		B, 'A'-$0A
+0223+  62F1 90          			SUB		B					; Subtract offset from the char to convert to value
+0224+  62F2 C1          			POP		BC
+0225+  62F3 C9          			RET
+0226+  62F4             
+0227+  62F4             ; UNIMPLEMENTED ROUTINES, DUMMY ROUTINES TO SATISFY JUMP TABLE
+0228+  62F4             
+0229+  62F4             
+0230+  62F4             ;**********************************************************************************
+0231+  62F4             ; STRDECVAL	- Gets the value of a decimal number string (16-Bit max)
+0232+  62F4             ;**********************************************************************************
+0233+  62F4             ; Entry: 	
+0234+  62F4             ;			HL : Location of string to count
+0235+  62F4             ; Exit: 	
+0236+  62F4             ;			BC : Value of the string (B=MSB,C=LSB) (if <256, B will be 0)
+0237+  62F4             ;*****************************************************************************
+0238+  62F4 01 00 00    _STRDECVAL:	LD		BC, $0000
+0239+  62F7 C9          			RET
+0240+  62F8             
+0044   62F8             #INCLUDE	"core/cli.asm"				; command line interface
+0001+  62F8             ;*************************************
+0002+  62F8             ; M62 BIOS 2
+0003+  62F8             ;************************************
+0004+  62F8             ; cli.asm - Command Line Interface
+0005+  62F8             ;************************************
+0006+  62F8             ; (C)Copyright 2019
+0007+  62F8             ; By Peter Murray
+0008+  62F8             ;************************************
+0009+  62F8             
+0010+  62F8             CMD_BUFF:			.EQU	$7D00					; Command buffer location
+0011+  62F8             CMD_SIZE:			.EQU	30							; command buffer size
+0012+  62F8             PARSE_CNT:			.EQU	CMD_BUFF+CMD_SIZE					; Parse count (# parameters)
+0013+  62F8             PARSE_TBL:			.EQU	PARSE_CNT+1					; Parse Pointer Table
+0014+  62F8 0D 0A 43 4C CLI_VERSION:			.BYTE	"\r\nCLI Version 1.0\r\n",EOS
+0014+  62FC 49 20 56 65 
+0014+  6300 72 73 69 6F 
+0014+  6304 6E 20 31 2E 
+0014+  6308 30 0D 0A 00 
+0015+  630C             
+0016+  630C             START_CLI:		
+0017+  630C C3 0F 63    			JP		CMD_LINE
+0018+  630F             			
+0019+  630F             CMD_LINE:
+0020+  630F 21 A2 64    			LD		HL, PROMPT
+0021+  6312 CD 12 61    			CALL	_PUTS
+0022+  6315 21 00 7D    			LD		HL, CMD_BUFF		; HL points to command buffer
+0023+  6318 0E 00       			LD		C, 0				; size of current command set to 0
+0024+  631A CD D7 60    CMD_NEXT:	CALL	_GETC				; Wait for and get character into A
+0025+  631D 77          			LD		(HL), A				; push the character into the buffer
+0026+  631E FE 0D       			CP		CR					; Check for Carriage Return					
+0027+  6320 CA 40 63    			JP		Z,CMD_DONE
+0028+  6323 FE 0A       			CP		LF					; Check for Line Feed					
+0029+  6325 CA 40 63    			JP		Z,CMD_DONE
+0030+  6328 FE 08       			CP		BS					; Check for Back Space				
+0031+  632A CA 45 63    			JP		Z,CMD_BS
+0032+  632D FE 1B       			CP		ESC					; Check for Escape character
+0033+  632F CA 0F 63    			JP		Z,CMD_LINE			; Jump back to command line
+0034+  6332 CD 15 61    			CALL	_PUTC
+0035+  6335 79          			LD		A, C
+0036+  6336 FE 1E       			CP		CMD_SIZE
+0037+  6338 CA 1A 63    			JP		Z, CMD_NEXT			; if we take up all the buffer then end the line
+0038+  633B 23          			INC		HL
+0039+  633C 0C          			INC		C			
+0040+  633D C3 1A 63    			JP		CMD_NEXT
+0041+  6340             CMD_DONE:	;INC		HL
+0042+  6340 36 00       			LD		(HL), EOS			; put the EOS character at the end of the buffer
+0043+  6342 C3 61 63    			JP		CHECK_CMD
+0044+  6345 79          CMD_BS:		LD		A, C
+0045+  6346 FE 00       			CP		$00
+0046+  6348 CA 1A 63    			JP		Z, CMD_NEXT			; if buffer is empty, go back
+0047+  634B 36 00       			LD		(HL), EOS
+0048+  634D 2B          			DEC		HL
+0049+  634E 0D          			DEC		C			
+0050+  634F 3E 08       			LD		A, BS
+0051+  6351 CD 15 61    			CALL	_PUTC
+0052+  6354 3E 20       			LD		A, ' '
+0053+  6356 CD 15 61    			CALL	_PUTC
+0054+  6359 3E 08       			LD		A, BS
+0055+  635B CD 15 61    			CALL	_PUTC
+0056+  635E C3 1A 63    			JP		CMD_NEXT
+0057+  6361             
+0058+  6361             CHECK_CMD:	;PUSH	HL
+0059+  6361 CD 0C 60    			CALL	PRINT_NEW_LINE			
+0060+  6364 21 00 7D    			LD		HL, CMD_BUFF
+0061+  6367 CD A6 64    			CALL	parse_cmdbuff		; Parse the buffer read for checking
+0062+  636A             
+0063+  636A             ;;;;; Uncomment to show what was parsed out of the command line
+0064+  636A             ;			LD		A, B
+0065+  636A             ;			CALL	PRINT_NEW_LINE			
+0066+  636A             ;			CALL	PRINT_HEX_BYTE
+0067+  636A             ;			CALL	PRINT_NEW_LINE			
+0068+  636A             ;			LD		HL, CMD_BUFF
+0069+  636A             ;			CALL	PUTS
+0070+  636A             ;			LD		A, '|'
+0071+  636A             ;			CALL	PUTC
+0072+  636A             ;			CALL	PRINT_NEW_LINE			
+0073+  636A             			
+0074+  636A             			; Check for HELP Command
+0075+  636A 21 00 7D    			LD		HL, CMD_BUFF
+0076+  636D 11 D4 64    			LD		DE, HELP_CMD
+0077+  6370 CD 1A 62    			CALL	_STRCMP
+0078+  6373 CA 27 65    			JP		Z, HELP_COMMAND
+0079+  6376             			; Check for ? Command
+0080+  6376 21 00 7D    			LD		HL, CMD_BUFF
+0081+  6379 11 E5 64    			LD		DE, HELP2_CMD
+0082+  637C CD 1A 62    			CALL	_STRCMP
+0083+  637F CA 27 65    			JP		Z, HELP_COMMAND
+0084+  6382             
+0085+  6382             			; Check for CLS Command
+0086+  6382 21 00 7D    			LD		HL, CMD_BUFF
+0087+  6385 11 D0 64    			LD		DE, CLS_CMD
+0088+  6388 CD 1A 62    			CALL	_STRCMP
+0089+  638B CA D4 63    			JP		Z, CLEAR_SCR			
+0090+  638E             			; Check for RESTART Command
+0091+  638E 21 00 7D    			LD		HL, CMD_BUFF
+0092+  6391 11 D9 64    			LD		DE, RST_CMD
+0093+  6394 CD 1A 62    			CALL	_STRCMP
+0094+  6397 CA DE 63    			JP		Z, RST_COMMAND
+0095+  639A             			; Check for R. Command (restart shorthand)
+0096+  639A 21 00 7D    			LD		HL, CMD_BUFF
+0097+  639D 11 E7 64    			LD		DE, RST2_CMD
+0098+  63A0 CD 1A 62    			CALL	_STRCMP
+0099+  63A3 CA DE 63    			JP		Z, RST_COMMAND
+0100+  63A6             			; Check for Memstat Command
+0101+  63A6             ;			LD		HL, CMD_BUFF
+0102+  63A6             ;			LD		DE, MST_CMD
+0103+  63A6             ;			CALL	_STRCMP
+0104+  63A6             ;			JP		Z, MEMSTAT
+0105+  63A6             			; Check for Application Command
+0106+  63A6             ;			LD		HL, CMD_BUFF
+0107+  63A6             ;			LD		DE, APP_CMD
+0108+  63A6             ;			CALL	_STRCMP
+0109+  63A6             ;			JP		Z, APP_COMMAND
+0110+  63A6             
+0111+  63A6             			; Check for Version Command
+0112+  63A6 21 00 7D    			LD		HL, CMD_BUFF
+0113+  63A9 11 E1 64    			LD		DE, VER_CMD
+0114+  63AC CD 1A 62    			CALL	_STRCMP
+0115+  63AF CA BF 63    			JP		Z, VER_COMMAND
+0116+  63B2             
+0117+  63B2             ;;;;;;;; Test commands ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+0118+  63B2             			; Check for TEST Command
+0119+  63B2             ;			LD		HL, CMD_BUFF
+0120+  63B2             ;			LD		DE, TEST_CMD
+0121+  63B2             ;			CALL	_STRCMP
+0122+  63B2             ;			JP		Z, CLI_TEST			
+0123+  63B2             			; Check for TEST2 Command
+0124+  63B2             ;			LD		HL, CMD_BUFF
+0125+  63B2             ;			LD		DE, TEST2_CMD
+0126+  63B2             ;			CALL	_STRCMP
+0127+  63B2             ;			JP		Z, CLI_TEST2
+0128+  63B2             
+0129+  63B2             
+0130+  63B2             			; Get here when no matching command
+0131+  63B2             			;	eventually we will insert code to check if it's an executable filename in the current device first
+0132+  63B2 21 FF 64    			LD		HL, NO_CMD
+0133+  63B5 CD 12 61    			CALL	_PUTS
+0134+  63B8 C3 0F 63    			JP		CMD_LINE
+0135+  63BB 76          LOOP:		HALT
+0136+  63BC C3 BB 63    			JP		LOOP
+0137+  63BF             
+0138+  63BF             VER_COMMAND:
+0139+  63BF 21 03 40    			LD		HL, BIOS_VERSION
+0140+  63C2 CD 03 60    			CALL	PUTS
+0141+  63C5 21 17 40    			LD		HL, BUILD_DATE
+0142+  63C8 CD 03 60    			CALL	PUTS
+0143+  63CB 21 F8 62    			LD		HL, CLI_VERSION
+0144+  63CE CD 12 61    			CALL	_PUTS
+0145+  63D1 C3 0F 63    			JP		CMD_LINE
+0146+  63D4             
+0147+  63D4 F5          CLEAR_SCR:	PUSH	AF
+0148+  63D5 CD 73 61    			CALL	_CLRSCR				
+0149+  63D8 F1          			POP		AF
+0150+  63D9 3E 00       			LD		A, $00
+0151+  63DB C3 0F 63    			JP		CMD_LINE			; return to command line
+0152+  63DE             
+0153+  63DE             RST_COMMAND:
+0154+  63DE 21 1E 7D    			LD		HL, PARSE_CNT
+0155+  63E1 3E 00       			LD		A, $00
+0156+  63E3 BE          			CP		(HL)
+0157+  63E4 CA 0F 64    			JP		Z, RST_NOPARAM		; If no parameters specified then show help for restart command
+0158+  63E7 11 1F 7D    			LD		DE, PARSE_TBL		
+0159+  63EA 1A          			LD		A, (DE)
+0160+  63EB 6F          			LD		L, A
+0161+  63EC 13          			INC		DE
+0162+  63ED 1A          			LD		A, (DE)				; point HL to first parameter
+0163+  63EE 67          			LD		H, A
+0164+  63EF 11 F5 64    			LD		DE, WARM_PARAM		; Check for warm parameter
+0165+  63F2 CD 1A 62    			CALL	_STRCMP
+0166+  63F5 CA 28 40    			JP		Z, OSIMAGE			; Restart OS
+0167+  63F8 11 1F 7D    			LD		DE, PARSE_TBL		
+0168+  63FB 1A          			LD		A, (DE)
+0169+  63FC 6F          			LD		L, A
+0170+  63FD 13          			INC		DE
+0171+  63FE 1A          			LD		A, (DE)				; point HL to first parameter
+0172+  63FF 67          			LD		H, A
+0173+  6400 11 FA 64    			LD		DE, COLD_PARAM		; Check for cold parameter
+0174+  6403 CD 1A 62    			CALL	_STRCMP
+0175+  6406 CA 18 64    			JP		Z, RST_COLD			; Do cold restart
+0176+  6409 21 21 64    			LD		HL, RST_IVLD
+0177+  640C CD 03 60    			CALL	PUTS				; Write "Invalid Parameter!" message
+0178+  640F             RST_NOPARAM:							; we get here too if a non-valid parameter exists
+0179+  640F 21 35 64    			LD		HL, RST_HELP
+0180+  6412 CD 03 60    			CALL	PUTS
+0181+  6415 C3 0F 63    			JP		CMD_LINE
+0182+  6418 3E 00       RST_COLD:	LD		A, $00
+0183+  641A 0E 00       			LD		C, $00
+0184+  641C ED 79       			OUT		(C), A				; Switch Bank 0 back to ROM
+0185+  641E C3 00 00    			JP		$0000
+0186+  6421             		
+0187+  6421             			
+0188+  6421 0D 49 6E 76 RST_IVLD:	.BYTE	"\r\Invalid parameter!",EOS
+0188+  6425 61 6C 69 64 
+0188+  6429 20 70 61 72 
+0188+  642D 61 6D 65 74 
+0188+  6431 65 72 21 00 
+0189+  6435 0D 0A 1B 5B RST_HELP:	.BYTE	"\r\n",ESC,"[7m restart usage: ",ESC,"[0m\r\n"
+0189+  6439 37 6D 20 72 
+0189+  643D 65 73 74 61 
+0189+  6441 72 74 20 75 
+0189+  6445 73 61 67 65 
+0189+  6449 3A 20 1B 5B 
+0189+  644D 30 6D 0D 0A 
+0190+  6451 20 20 72 65 			.BYTE	"  restart cold = restart back into BIOS\r\n"
+0190+  6455 73 74 61 72 
+0190+  6459 74 20 63 6F 
+0190+  645D 6C 64 20 3D 
+0190+  6461 20 72 65 73 
+0190+  6465 74 61 72 74 
+0190+  6469 20 62 61 63 
+0190+  646D 6B 20 69 6E 
+0190+  6471 74 6F 20 42 
+0190+  6475 49 4F 53 0D 
+0190+  6479 0A 
+0191+  647A 20 20 72 65 			.BYTE	"  restart warm = restart back into OS\r\n",EOS
+0191+  647E 73 74 61 72 
+0191+  6482 74 20 77 61 
+0191+  6486 72 6D 20 3D 
+0191+  648A 20 72 65 73 
+0191+  648E 74 61 72 74 
+0191+  6492 20 62 61 63 
+0191+  6496 6B 20 69 6E 
+0191+  649A 74 6F 20 4F 
+0191+  649E 53 0D 0A 00 
+0192+  64A2             
+0193+  64A2 0D 0A 3E 00 PROMPT:		.BYTE	"\r\n>",EOS
+0194+  64A6             
+0195+  64A6             
+0196+  64A6             
+0197+  64A6             ; PARSE_CNT = Count of parameter strings
+0198+  64A6             ; PARSE_TBL = Location of beginging of Parse Table (SSx)
+0199+  64A6             ; | # substrings | SS1 PTR | SS2 PTR | ... | SSn PTR |
+0200+  64A6             			
+0201+  64A6             ; parse the of substrings in a string
+0202+  64A6             ;	This will change the space characters to EOS chars ($00/Null) and put the address of
+0203+  64A6             ;	the start of each parameter substring on the table starting at PARSE_TLB
+0204+  64A6             ;	the beginning of the command string will still be at CMD_BUFF
+0205+  64A6             ; Exit:		B		: Stores the number of parameter substrings (command not counted)
+0206+  64A6             parse_cmdbuff:
+0207+  64A6 06 00       			LD		B, $00				; set substring counter to 0
+0208+  64A8 11 1F 7D    			LD		DE, PARSE_TBL		; Set DE to be the location of the parse table
+0209+  64AB 21 00 7D    			LD		HL, CMD_BUFF
+0210+  64AE             ps_readnext:
+0211+  64AE 3E 00       			LD		A, $00
+0212+  64B0 BE          			CP		(HL)				; Compare the character with null (are we at the end of the string)
+0213+  64B1 CA CB 64    			JP		Z, ps_done			; If it's null, we are done, update count at PARSE_CNT
+0214+  64B4 3E 20       			LD		A, ' '				; Seperator character, space in this case
+0215+  64B6 BE          			CP		(HL)				; Compare the character with the seperator
+0216+  64B7 C2 C7 64    			JP		NZ, ps_nextchar		; if there isn't a separator we don't increment the counter
+0217+  64BA 36 00       			LD		(HL), $00			; Change seperator to EOS char (splits the string)
+0218+  64BC 04          			INC		B					; Increment substring count
+0219+  64BD 23          			INC		HL					; Next char location
+0220+  64BE 7D          			LD		A, L
+0221+  64BF 12          			LD		(DE), A				; Put the low byte of the substring address on the table
+0222+  64C0 13          			INC		DE
+0223+  64C1 7C          			LD		A, H
+0224+  64C2 12          			LD		(DE), A				; Put the high byte of the substring address on the table
+0225+  64C3 13          			INC		DE
+0226+  64C4 C3 AE 64    			JP		ps_readnext			; Go around again
+0227+  64C7             ps_nextchar:
+0228+  64C7 23          			INC		HL
+0229+  64C8 C3 AE 64    			JP		ps_readnext
+0230+  64CB 21 1E 7D    ps_done:	LD		HL, PARSE_CNT
+0231+  64CE 70          			LD		(HL), B				; Save the Parameter (substring) count to PARSE_CNT
+0232+  64CF C9          			RET							; Return to CLI
+0233+  64D0             
+0234+  64D0             
+0235+  64D0             ; Command strings
+0236+  64D0 63 6C 73 00 CLS_CMD:		.BYTE	"cls",EOS
+0237+  64D4 68 65 6C 70 HELP_CMD:		.BYTE	"help",EOS
+0237+  64D8 00 
+0238+  64D9 72 65 73 74 RST_CMD:		.BYTE	"restart",EOS
+0238+  64DD 61 72 74 00 
+0239+  64E1 76 65 72 00 VER_CMD:		.BYTE	"ver",EOS
+0240+  64E5             
+0241+  64E5             ; Shorthand commands
+0242+  64E5 3F 00       HELP2_CMD:		.BYTE	"?",EOS
+0243+  64E7 72 2E 00    RST2_CMD:		.BYTE	"r.",EOS
+0244+  64EA             
+0245+  64EA 74 65 73 74 TEST_CMD:		.BYTE	"test",EOS
+0245+  64EE 00 
+0246+  64EF 74 65 73 74 TEST2_CMD:		.BYTE	"test2",EOS
+0246+  64F3 32 00 
+0247+  64F5             ; Parameter strings
+0248+  64F5 77 61 72 6D WARM_PARAM:		.BYTE	"warm",EOS
+0248+  64F9 00 
+0249+  64FA 63 6F 6C 64 COLD_PARAM:		.BYTE	"cold",EOS
+0249+  64FE 00 
+0250+  64FF             
+0251+  64FF 0D 0A 55 6E NO_CMD:			.BYTE	"\r\nUnknown command, type help for help\r\n",EOS
+0251+  6503 6B 6E 6F 77 
+0251+  6507 6E 20 63 6F 
+0251+  650B 6D 6D 61 6E 
+0251+  650F 64 2C 20 74 
+0251+  6513 79 70 65 20 
+0251+  6517 68 65 6C 70 
+0251+  651B 20 66 6F 72 
+0251+  651F 20 68 65 6C 
+0251+  6523 70 0D 0A 00 
+0252+  6527             
+0253+  6527             HELP_COMMAND:
+0254+  6527 21 1E 7D    			LD		HL, PARSE_CNT
+0255+  652A 3E 00       			LD		A, $00
+0256+  652C BE          			CP		(HL)
+0257+  652D CA 4A 65    			JP		Z, SHOW_HELP		; If no parameters specified then show help for restart command
+0258+  6530 11 1F 7D    			LD		DE, PARSE_TBL		
+0259+  6533 1A          			LD		A, (DE)
+0260+  6534 6F          			LD		L, A
+0261+  6535 13          			INC		DE
+0262+  6536 1A          			LD		A, (DE)				; point HL to first parameter
+0263+  6537 67          			LD		H, A
+0264+  6538             ;			LD		DE, AST_PARAM			; Check for status parameter
+0265+  6538             ;			CALL	_STRCMP
+0266+  6538             ;			JP		Z, APP_STAT  		; Show application status			
+0267+  6538             
+0268+  6538 11 D9 64    			LD		DE, RST_CMD			; Asking for help on "restart"
+0269+  653B CD 1A 62    			CALL	_STRCMP
+0270+  653E CA 0F 64    			JP		Z, RST_NOPARAM
+0271+  6541             
+0272+  6541             ;			LD		DE, APP_CMD			; Asking for help on "app"
+0273+  6541             ;			CALL	_STRCMP
+0274+  6541             ;			JP		Z, APP_NOPARAM
+0275+  6541             
+0276+  6541             			; no valid parameter was found:
+0277+  6541 21 55 65    			LD		HL, HLP_NOHELP
+0278+  6544 CD 03 60    			CALL	PUTS
+0279+  6547 C3 0F 63    			JP		CMD_LINE
+0280+  654A             
+0281+  654A F5          SHOW_HELP:	PUSH	AF
+0282+  654B 21 7C 65    			LD		HL, HELP_STRING
+0283+  654E CD 12 61    			CALL	_PUTS
+0284+  6551 F1          			POP		AF
+0285+  6552 C3 0F 63    			JP		CMD_LINE			; return to command line
+0286+  6555             
+0287+  6555 0D 0A 4E 6F HLP_NOHELP:	.BYTE	"\r\nNo help on that command was found.\r\n",EOS
+0287+  6559 20 68 65 6C 
+0287+  655D 70 20 6F 6E 
+0287+  6561 20 74 68 61 
+0287+  6565 74 20 63 6F 
+0287+  6569 6D 6D 61 6E 
+0287+  656D 64 20 77 61 
+0287+  6571 73 20 66 6F 
+0287+  6575 75 6E 64 2E 
+0287+  6579 0D 0A 00 
+0288+  657C             
+0289+  657C 0D 0A 1B 5B HELP_STRING:.BYTE	"\r\n",ESC,"[7m Help ",ESC,"[0m\r\n"
+0289+  6580 37 6D 20 48 
+0289+  6584 65 6C 70 20 
+0289+  6588 1B 5B 30 6D 
+0289+  658C 0D 0A 
+0290+  658E 72 65 73 74 			.BYTE	"restart (or r.) - Restarts the system\r\n"
+0290+  6592 61 72 74 20 
+0290+  6596 28 6F 72 20 
+0290+  659A 72 2E 29 20 
+0290+  659E 2D 20 52 65 
+0290+  65A2 73 74 61 72 
+0290+  65A6 74 73 20 74 
+0290+  65AA 68 65 20 73 
+0290+  65AE 79 73 74 65 
+0290+  65B2 6D 0D 0A 
+0291+  65B5 63 6C 73 20 			.BYTE	"cls             - Clear the screen\r\n"
+0291+  65B9 20 20 20 20 
+0291+  65BD 20 20 20 20 
+0291+  65C1 20 20 20 20 
+0291+  65C5 2D 20 43 6C 
+0291+  65C9 65 61 72 20 
+0291+  65CD 74 68 65 20 
+0291+  65D1 73 63 72 65 
+0291+  65D5 65 6E 0D 0A 
+0292+  65D9 68 65 6C 70 			.BYTE	"help (or ?)     - This help menu\r\n",EOS
+0292+  65DD 20 28 6F 72 
+0292+  65E1 20 3F 29 20 
+0292+  65E5 20 20 20 20 
+0292+  65E9 2D 20 54 68 
+0292+  65ED 69 73 20 68 
+0292+  65F1 65 6C 70 20 
+0292+  65F5 6D 65 6E 75 
+0292+  65F9 0D 0A 00 
+0293+  65FC             
+0294+  65FC             ;#INCLUDE		"commands/help.asm"
+0295+  65FC             ;#INCLUDE		"commands/memstat.asm"
+0296+  65FC             ;#INCLUDE		"commands/application.asm"
+0297+  65FC             ;#INCLUDE		"commands/testcmd.asm"
+0298+  65FC             ;#INCLUDE		"core/bin_rx.asm"0045   65FC             
+0046   65FC             .END
+tasm: Number of errors = 0
